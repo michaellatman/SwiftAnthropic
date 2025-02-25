@@ -20,77 +20,84 @@ import Foundation
 ///
 /// This structured sequence facilitates the orderly reception and processing of message components and overall changes.
 public struct MessageStreamResponse: Decodable {
-   
+
    public let type: String
-   
+
    public let index: Int?
-   
+
    /// available in "content_block_start" event
    public let contentBlock: ContentBlock?
-   
+
    /// available in "message_start" event
    public let message: MessageResponse?
-   
+
    /// Available in "content_block_delta", "message_delta" events.
    public let delta: Delta?
-    
+
    /// Available in "message_delta" events.
    public let usage: MessageResponse.Usage?
-   
+
    public var streamEvent: StreamEvent? {
       StreamEvent(rawValue: type)
    }
-   
+
    public struct Delta: Decodable {
-      
+
       public let type: String?
-      
+
       /// type = text
       public let text: String?
-      
+
       /// type = tool_use
       public let partialJson: String?
-      
+
       // type = citations_delta
       public let citation: MessageResponse.Citation?
 
+      /// type = thinking
+      public let signature: String?
+
+      /// type = thinking
+      public let thinking: String?
+
       public let stopReason: String?
-      
+
       public let stopSequence: String?
    }
-   
+
    public struct ContentBlock: Decodable {
-      
-      // Can be of type `text` or `tool_use`
+
+      // Can be of type `text`, `tool_use`, or `thinking`
       public let type: String
-      
+
       /// `text` type
       public let text: String?
-      
+
       // Citations for text type
       public let citations: [MessageResponse.Citation]?
-      
+
       /// `tool_use` type
       public let input: [String: MessageResponse.Content.DynamicContent]?
-      
+
       public let name: String?
-      
+
       public let id: String?
-      
+
       public var toolUse: MessageResponse.Content.ToolUse? {
          guard let name, let id else { return nil }
          return .init(id: id, name: name, input: input ?? [:])
       }
    }
-   
+
    /// https://docs.anthropic.com/en/api/messages-streaming#event-types
    public enum StreamEvent: String {
-      
+
       case contentBlockStart = "content_block_start"
       case contentBlockDelta = "content_block_delta"
       case contentBlockStop = "content_block_stop"
       case messageStart = "message_start"
       case messageDelta = "message_delta"
       case messageStop = "message_stop"
+      case thinkingDelta = "thinking_delta"
    }
 }

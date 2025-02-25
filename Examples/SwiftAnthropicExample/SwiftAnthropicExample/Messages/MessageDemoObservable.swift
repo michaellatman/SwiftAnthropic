@@ -11,21 +11,22 @@ import SwiftUI
 
 @MainActor
 @Observable class MessageDemoObservable {
-   
+
    let service: AnthropicService
    var message: String = ""
+   var thinking: String = ""
    var errorMessage: String = ""
    var isLoading = false
    var selectedPDF: Data? = nil
    var inputTokensCount: String?
-   
+
    init(service: AnthropicService) {
       self.service = service
    }
-   
+
    func createMessage(
-      parameters: MessageParameter) async throws
-   {
+      parameters: MessageParameter
+   ) async throws {
       task = Task {
          do {
             isLoading = true
@@ -47,10 +48,10 @@ import SwiftUI
          }
       }
    }
-   
+
    func streamMessage(
-      parameters: MessageParameter) async throws
-   {
+      parameters: MessageParameter
+   ) async throws {
       task = Task {
          do {
             var citationCitedText = ""
@@ -58,16 +59,32 @@ import SwiftUI
             let stream = try await service.streamMessage(parameters)
             isLoading = false
             for try await result in stream {
-               let content = result.delta?.text ?? ""
-               self.message += content
-               switch result.delta?.citation {
-               case .charLocation(let charLocation):
-                  citationCitedText += charLocation.citedText ?? ""
-               case .contentBlockLocation(let blockLocation):
-                  citationCitedText += blockLocation.citedText ?? ""
-               case .pageLocation(let pageLocation):
-                  citationCitedText += pageLocation.citedText ?? ""
-               default: break
+               switch result.type {
+               case MessageStreamResponse.StreamEvent.contentBlockDelta.rawValue:
+                  let content = result.delta?.text ?? ""
+                  self.message += content
+
+                  switch result.delta?.citation {
+                  case .charLocation(let charLocation):
+                     citationCitedText += charLocation.citedText ?? ""
+                  case .contentBlockLocation(let blockLocation):
+                     citationCitedText += blockLocation.citedText ?? ""
+                  case .pageLocation(let pageLocation):
+                     citationCitedText += pageLocation.citedText ?? ""
+                  default: break
+                  }
+
+                  if let thinkingText = result.delta?.thinking {
+                     self.thinking += thinkingText
+                  }
+
+               case MessageStreamResponse.StreamEvent.thinkingDelta.rawValue:
+                  if let thinkingText = result.delta?.thinking {
+                     self.thinking += thinkingText
+                  }
+
+               default:
+                  break
                }
             }
             if !citationCitedText.isEmpty {
@@ -78,41 +95,43 @@ import SwiftUI
          }
       }
    }
-   
+
    func countTokens(parameters: MessageTokenCountParameter) async throws {
       let inputTokens = try await service.countTokens(parameter: parameters)
       inputTokensCount = "\(inputTokens.inputTokens)"
    }
-   
+
    func analyzePDF(prompt: String, selectedSegment: MessageDemoView.ChatConfig) async throws {
       guard let pdfData = selectedPDF else {
          errorMessage = "No PDF selected"
          return
       }
-      
+
       // Convert PDF to base64
       let base64PDF = pdfData.base64EncodedString()
-      
+
       do {
          // Create document source with citations enabled
-         let documentSource = try MessageParameter.Message.Content.DocumentSource.pdf(base64Data: base64PDF, citations: .init(enabled: true))
-         
+         let documentSource = try MessageParameter.Message.Content.DocumentSource.pdf(
+            base64Data: base64PDF, citations: .init(enabled: true))
+
          // Create message with document and prompt
          let message = MessageParameter.Message(
             role: .user,
             content: .list([
                .document(documentSource),
-               .text(prompt.isEmpty ? "Please analyze this document and provide a summary" : prompt)
+               .text(
+                  prompt.isEmpty ? "Please analyze this document and provide a summary" : prompt),
             ])
          )
-         
+
          // Create parameters
          let parameters = MessageParameter(
             model: .claude35Sonnet,
             messages: [message],
             maxTokens: 1024
          )
-         
+
          // Send request based on selected mode
          switch selectedSegment {
          case .message:
@@ -120,7 +139,7 @@ import SwiftUI
          case .messageStream:
             try await streamMessage(parameters: parameters)
          }
-         
+
       } catch MessageParameter.Message.Content.DocumentSource.DocumentError.exceededSizeLimit {
          errorMessage = "PDF exceeds size limit (32MB)"
       } catch MessageParameter.Message.Content.DocumentSource.DocumentError.invalidBase64Data {
@@ -129,17 +148,18 @@ import SwiftUI
          errorMessage = "Error analyzing PDF: \(error.localizedDescription)"
       }
    }
-   
+
    func cancelStream() {
       task?.cancel()
    }
-   
+
    func clearMessage() {
       message = ""
+      thinking = ""
       selectedPDF = nil
       errorMessage = ""
    }
-   
+
    // MARK: Private
    private var task: Task<Void, Never>? = nil
 }

@@ -18,7 +18,9 @@ struct ServiceSelectionView: View {
                      Text("Default Anthropic Service")
                         .padding(.bottom, 10)
                      Group {
-                        Text("Use this service to test Anthropic functionality by providing your own Anthropic key.")
+                        Text(
+                           "Use this service to test Anthropic functionality by providing your own Anthropic key."
+                        )
                      }
                      .font(.caption)
                      .fontWeight(.light)
@@ -30,7 +32,9 @@ struct ServiceSelectionView: View {
                      Text("AIProxy Service")
                         .padding(.bottom, 10)
                      Group {
-                        Text("Use this service to test Anthropic functionality with requests proxied through AIProxy for key protection.")
+                        Text(
+                           "Use this service to test Anthropic functionality with requests proxied through AIProxy for key protection."
+                        )
                      }
                      .font(.caption)
                      .fontWeight(.light)
